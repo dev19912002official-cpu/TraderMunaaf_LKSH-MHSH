@@ -402,6 +402,16 @@
     margin-top: 8px;
     letter-spacing: 0.5px;
   }
+  .fallback-link {
+    display: none;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--green);
+    margin-top: 8px;
+    text-decoration: underline;
+  }
+  .fallback-link.show { display: block; }
 
   .footer-bar {
     padding: 10px 14px;
@@ -569,14 +579,29 @@ src="https://www.facebook.com/tr?id=925163213968320&ev=PageView&noscript=1"
           <span class="text-10">టెలిగ్రామ్ చానల్‌లో చేరండి</span>
         </a>
         <div class="cta-note">నొక్కి టెలిగ్రామ్‌కి వెళ్లండి • ఉచిత యాక్సెస్</div>
+        <div class="cta-note" style="margin-top:4px; opacity:0.75;">⏳ "Request Sent" కనిపిస్తుంది — కొద్ది సేపట్లో ఆమోదించబడతారు</div>
+        <a href="https://t.me/+uHH-AM_ca6NlYjU1" class="fallback-link" id="fallbackLink">Redirect కాలేదా? ఇక్కడ నొక్కండి</a>
       </div>
 
       <!-- FOOTER -->
-      <div class="footer-bar">
+      <<div class="footer-bar">
         <p>విద్యా ప్రయోజనాల కోసం మాత్రమే</p>
-        <p class="credit">ADV BY SRS MARKETING AGENCY</p>
+        <div class="disclaimer"><div style="text-align:center; margin:14px 0 10px 0; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);">
+  <p style="font-weight:bold; margin-bottom:6px; font-size:11px; color:#94a3b8;">Advertised by : *SRS Marketing Agency</p>
+  <a href="https://t.me/srsagency" target="_blank" style="
+      display:inline-block;
+      background-color:#FF0000;
+      color:#ffffff;
+      padding:6px 14px;
+      border-radius:6px;
+      text-decoration:none;
+      font-weight:600;
+      font-size:12px;
+      font-family:sans-serif;">
+    📩 Visit@*SRS Marketing Agency
+  </a>
+        
       </div>
-
     </div>
   </div>
 </div>
@@ -650,7 +675,39 @@ setInterval(updateClock, 300);
 updateClock();
 
 const ctaBtn = document.getElementById('ctaBtn');
+const fallbackLink = document.getElementById('fallbackLink');
 let LeadFired = false;
+
+// === SILENT QUALITY SIGNALS ===
+// Button turant clickable rehta hai (koi delay/disabled state nahi — speed
+// pe zero impact), lekin background mein genuine vs impulsive/bot click
+// classify hota hai. Genuine click "Lead" banta hai, bahut jaldi/bina
+// interaction wala click "LowQualityClick" mein jata hai — isse Meta ko
+// cleaner signal milta hai, algorithm behtar audience target karta hai.
+const pageLoadTime = Date.now();
+let hasScrolled = false;
+let hasMouseMoved = false;
+window.addEventListener('scroll', () => { hasScrolled = true; }, { once: true });
+document.addEventListener('mousemove', () => { hasMouseMoved = true; }, { once: true });
+document.addEventListener('touchstart', () => { hasMouseMoved = true; }, { once: true });
+
+function isLikelyRealUser() {
+  const timeOnPage = Date.now() - pageLoadTime;
+  // Fast threshold (1.2s) — jaanbujh kar strict nahi rakha, kyunki page
+  // already 75% convert kar raha hai, matlab traffic quality achhi hai.
+  // Zyada strict gating genuine fast-clickers ko bhi filter kar degi.
+  if (timeOnPage < 1200) return false;
+  if (!hasScrolled && !hasMouseMoved) return false;
+  return true;
+}
+
+function isProbablyBot() {
+  if (navigator.webdriver) return true;
+  if (/bot|crawl|spider|slurp|headless/i.test(navigator.userAgent)) return true;
+  return false;
+}
+
+if (fallbackLink) fallbackLink.href = ctaBtn.href;
 
 ctaBtn.addEventListener('click', function (e) {
   e.preventDefault();
@@ -662,13 +719,23 @@ ctaBtn.addEventListener('click', function (e) {
   }
   LeadFired = true;
 
+  if (isProbablyBot()) {
+    // Bot detect hua — koi tracking event nahi, seedha redirect
+    window.location.href = destination;
+    return;
+  }
+
+  const eventId = 'Lead_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+
   if (typeof fbq === 'function') {
-    fbq('track', 'Lead', {
-      content_name: 'Trader Munaaf Skill Channel',
-      content_category: 'Skill Development'
-    }, {
-      eventID: 'Lead_' + Date.now()
-    });
+    if (isLikelyRealUser()) {
+      fbq('track', 'Lead', {
+        content_name: 'Trader Munaaf Skill Channel',
+        content_category: 'Skill Development'
+      }, { eventID: eventId });
+    } else {
+      fbq('trackCustom', 'LowQualityClick', { eventID: eventId });
+    }
   }
 
   // 200ms delay — mobile/in-app browsers (FB/IG) mein turant navigation se
@@ -677,6 +744,12 @@ ctaBtn.addEventListener('click', function (e) {
   setTimeout(function () {
     window.location.href = destination;
   }, 200);
+
+  // Safety net: agar kisi wajah se redirect na ho, 1.3s baad manual
+  // fallback link dikha do
+  setTimeout(function () {
+    if (fallbackLink) fallbackLink.classList.add('show');
+  }, 1300);
 });
 </script>
 
